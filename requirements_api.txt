@@ -3,3 +3,6 @@ openai==1.76.0
 pyautogen==0.9
 anthropic==0.50.0
 flaml[automl]==2.3.1
+fastapi==0.110.0
+uvicorn==0.30.0
+websockets==12.0

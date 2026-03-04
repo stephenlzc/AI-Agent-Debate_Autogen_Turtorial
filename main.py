@@ -39,7 +39,7 @@ def test_llm_connection():
     """
     print("正在测试LLM连接...")
     try:
-        # 测试自定义LLM
+        # 只测试自定义LLM
         custom_client = OpenAI(
             api_key=CUSTOM_LLM_API_KEY,
             base_url=CUSTOM_LLM_API_BASE
@@ -52,17 +52,7 @@ def test_llm_connection():
             ]
         )
         
-        # 测试OpenAI官方API
-        openai_client = OpenAI(api_key=OPENAI_API_KEY)
-        response_openai = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": "你好，这是一个测试消息。请回复'测试成功'。"}
-            ]
-        )
-        
-        if (response and response.choices and response.choices[0].message.content and
-            response_openai and response_openai.choices and response_openai.choices[0].message.content):
+        if response and response.choices and response.choices[0].message.content:
             print("LLM连接测试成功！")
             return True
     except Exception as e:
@@ -225,11 +215,12 @@ def create_agents(topic):
 
 def create_judge_agent():
     """
-    创建使用OpenAI官方API的裁判智能体
+    创建使用自定义LLM的裁判智能体
     """
     judge_config = [{
-        "model": "gpt-4o-mini",
-        "api_key": OPENAI_API_KEY
+        "model": CUSTOM_LLM_MODEL,
+        "api_key": CUSTOM_LLM_API_KEY,
+        "base_url": CUSTOM_LLM_API_BASE
     }]
 
     judge_agent = ConversableAgent(
