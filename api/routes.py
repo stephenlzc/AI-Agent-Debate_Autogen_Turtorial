@@ -16,6 +16,7 @@ from api.debate import start_debate
 from api.websocket import manager
 from api.speech import speech_service
 from api.config import SPEECH_ENABLED
+from api.debate_view import debate_view_router  # 导入辩论视图路由
 
 # 创建路由
 router = APIRouter()

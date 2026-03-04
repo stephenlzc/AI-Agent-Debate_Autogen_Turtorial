@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router
+from api.debate_view import debate_view_router
 from api.config import SERVER_HOST, SERVER_PORT
 
 # 创建FastAPI应用
@@ -31,7 +32,10 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(router)
+app.include_router(debate_view_router)  # 路由器已经定义了前缀，不需要再添加
 
 if __name__ == "__main__":
-    print(f"启动服务器：http://{SERVER_HOST}:{SERVER_PORT}")
-    uvicorn.run(app, host=SERVER_HOST, port=SERVER_PORT)
+    # 强制使用端口8001
+    port = 8001
+    print(f"启动服务器：http://{SERVER_HOST}:{port}")
+    uvicorn.run(app, host=SERVER_HOST, port=port)

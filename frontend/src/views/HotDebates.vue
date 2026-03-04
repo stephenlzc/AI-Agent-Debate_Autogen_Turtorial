@@ -2,34 +2,43 @@
   <div class="hot-debates-container">
     <header class="header">
       <div class="placeholder"></div>
-      <h1>热点辩论</h1>
+      <h1>热点话题</h1>
       <div class="add-button" @click="addNewDebate">
         <span>+</span>
       </div>
     </header>
     
     <main class="main-content">
-      <div class="debate-list">
-        <div v-for="(debate, index) in debates" :key="index" class="debate-item">
-          <div class="debate-content" @click="viewDebate(debate)">
-            <h2 class="debate-title">{{ debate.title }}</h2>
-            <div class="debate-source">{{ debate.source }}</div>
-          </div>
-          <div class="play-button" @click.stop="playDebate(debate)">
-            <div class="play-icon">
-              <svg class="icon-svg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-                <path d="M341.333333 213.333333v597.333334l469.333334-298.666667z" fill="currentColor"/>
-              </svg>
-            </div>
-          </div>
+  <div v-if="loading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>加载中...</p>
+  </div>
+  <div v-else-if="debates.length === 0" class="empty-container">
+    <p>暂无辩论数据</p>
+  </div>
+  <div v-else class="debate-list">
+    <div v-for="debate in debates" :key="debate.id" class="debate-item">
+      <div class="debate-content" @click="viewDebate(debate)">
+        <h2 class="debate-title">{{ debate.title }}</h2>
+        <div class="debate-source">{{ debate.source }}</div>
+      </div>
+      <div class="play-button" @click.stop="playDebate(debate)">
+        <div class="play-icon">
+          <svg class="icon-svg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path d="M341.333333 213.333333v597.333334l469.333334-298.666667z" fill="currentColor"/>
+          </svg>
         </div>
       </div>
-    </main>
+    </div>
+  </div>
+</main>
     
     <MiniPlayer 
+      ref="miniPlayer"
       :isVisible="showMiniPlayer" 
       :title="currentDebate.title" 
       :subtitle="currentDebate.source"
+      :debateData="currentDebate"
       @close="closeMiniPlayer"
       @toggle-play="togglePlay"
     />
@@ -41,6 +50,8 @@
 <script>
 import BottomNavBar from '../components/BottomNavBar.vue';
 import MiniPlayer from '../components/MiniPlayer.vue';
+import axios from 'axios';
+import apiConfig from '../config/api.js';
 
 export default {
   name: 'HotDebatesView',
@@ -49,75 +60,49 @@ export default {
     MiniPlayer
   },
   data() {
-    return {
-      showMiniPlayer: false,
-      currentDebate: {},
-      debates: [
-        {
-          id: 1,
-          title: 'P人也要时间管理? 2024的实践小结',
-          source: 'sspai.com',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: true
-        },
-        {
-          id: 2,
-          title: 'CES成芯片巨头"斗秀场"，新品巅峰对决',
-          source: '36kr.com',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: true
-        },
-        {
-          id: 3,
-          title: '中国人为何唯爱孙悟空?',
-          source: 'www.thepaper.cn',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: true
-        },
-        {
-          id: 4,
-          title: '段永平浙大见面会万字实录：最重要的不是勤奋，而是做对事情',
-          source: 'www.thepaper.cn',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: true
-        },
-        {
-          id: 5,
-          title: '人工智能是否会取代人类工作？',
-          source: 'debate.ai',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: false
-        },
-        {
-          id: 6,
-          title: '网络教育能否替代传统教育？',
-          source: 'debate.ai',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: false
-        },
-        {
-          id: 7,
-          title: '是否应该推行全民基本收入？',
-          source: 'debate.ai',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: true
-        },
-        {
-          id: 8,
-          title: '大城市生活与小城市生活哪个更好？',
-          source: 'debate.ai',
-          image: 'https://via.placeholder.com/80',
-          hasVideo: false
-        }
-      ]
-    }
-  },
+  return {
+    showMiniPlayer: false,
+    currentDebate: {},
+    debates: [],
+    loading: false,
+    page: 1,
+    per_page: 10,
+    total: 0
+  }
+},
+created() {
+  this.fetchDebates();
+},
   methods: {
-    viewDebate(debate) {
-      console.log('查看辩论:', debate);
-      // 这里应该跳转到辩论详情页面
-      this.$router.push('/debate');
-    },
+    fetchDebates() {
+  this.loading = true;
+  axios.get(`${apiConfig.getUrl(apiConfig.endpoints.debates)}?page=${this.page}&per_page=${this.per_page}`)
+    .then(response => {
+      if (response.data.code === 200) {
+        this.debates = response.data.data.debates.map(debate => ({
+          id: debate.id,
+          title: debate.topic,
+          source: new URL(debate.url).hostname,
+          hasVideo: true,
+          originalData: debate
+        }));
+        this.total = response.data.data.total;
+      } else {
+        console.error('获取辩论列表失败:', response.data.message);
+      }
+    })
+    .catch(error => {
+      console.error('获取辩论列表出错:', error);
+    })
+    .finally(() => {
+      this.loading = false;
+    });
+},
+viewDebate(debate) {
+  console.log('查看辩论:', debate);
+  // 跳转到辩论详情页面，并传递辩论ID
+  this.$router.push(`/debate?id=${debate.id}`);
+},
     addNewDebate() {
       // 跳转到添加辩论话题页面
       this.$router.push('/add-debate-topic');
@@ -132,8 +117,19 @@ export default {
     },
     
     playDebate(debate) {
+      // 设置当前辩论数据
       this.currentDebate = debate;
+      // 显示迷你播放器
       this.showMiniPlayer = true;
+      console.log('播放辩论:', debate.title, '音频数据:', debate.originalData?.rounds);
+      
+      // 使用$nextTick确保迷你播放器已经渲染完成
+      this.$nextTick(() => {
+        // 通过引用调用迷你播放器的播放方法
+        if (this.$refs.miniPlayer) {
+          this.$refs.miniPlayer.startPlayingImmediately();
+        }
+      });
     },
     
     closeMiniPlayer() {
@@ -142,6 +138,7 @@ export default {
     
     togglePlay(isPlaying) {
       console.log('播放状态:', isPlaying ? '播放中' : '已暂停');
+      // 可以在这里添加播放状态的其他处理逻辑
     }
   }
 }
@@ -299,5 +296,31 @@ export default {
 
 .nav-item.active {
   color: #07c160;
+}
+.loading-container, .empty-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: #999;
+  background-color: white;
+  border-radius: 8px;
+  margin-top: 15px;
+}
+
+.loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #07c160;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

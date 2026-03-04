@@ -8,7 +8,8 @@ from typing import List, Dict
 debateck = Blueprint('debateck', __name__)
 
 # 文件存储配置
-DEBATE_FILE = 'debates.jsonl'
+# 使用绝对路径指向项目根目录下的debates.jsonl文件
+DEBATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'debates.jsonl')
 MAX_DEBATES = 100
 DEBATES: List[Dict] = []
 

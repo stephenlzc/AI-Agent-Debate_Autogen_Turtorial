@@ -27,7 +27,7 @@
     <div 
       class="nav-item" 
       :class="{ active: activePage === 'debate' }" 
-      @click="navigateTo('/debate')"
+      @click="navigateToFirstDebate()"
     >
       <div class="icon">
         <svg class="icon-svg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
@@ -52,6 +52,9 @@
 </template>
 
 <script>
+import apiConfig from '../config/api.js';
+import axios from 'axios';
+
 export default {
   name: 'BottomNavBar',
   props: {
@@ -68,6 +71,30 @@ export default {
       if (this.$route.path !== path) {
         this.$router.push(path);
       }
+    },
+    
+    // 导航到辩论页面，并携带第一条辩论的ID参数
+    navigateToFirstDebate() {
+      // 获取热门辩论列表
+      axios.get(`${apiConfig.getUrl(apiConfig.endpoints.debates)}?page=1&per_page=10`)
+        .then(response => {
+          if (response.data.code === 200 && response.data.data.debates && response.data.data.debates.length > 0) {
+            // 获取第一条辩论的ID
+            const firstDebateId = response.data.data.debates[0].id;
+            // 跳转到辩论页面，并携带ID参数
+            this.$router.push(`/debate?id=${firstDebateId}`);
+            console.log('跳转到第一条辩论:', firstDebateId);
+          } else {
+            // 如果没有辩论，则跳转到空白的辩论页面
+            this.navigateTo('/debate');
+            console.log('没有辩论数据，跳转到空白辩论页面');
+          }
+        })
+        .catch(error => {
+          console.error('获取热门辩论列表失败:', error);
+          // 出错时跳转到空白的辩论页面
+          this.navigateTo('/debate');
+        });
     }
   }
 }

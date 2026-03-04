@@ -83,7 +83,7 @@ SPEECH_CONFIG = {
 
 # 服务器配置
 SERVER_HOST = os.getenv('SERVER_HOST', '0.0.0.0')
-SERVER_PORT = int(os.getenv('SERVER_PORT', '8000'))
+SERVER_PORT = int(os.getenv('SERVER_PORT', '8001'))  # 修改默认端口为8001
 CORS_ORIGINS = json.loads(os.getenv('CORS_ORIGINS', '["*"]'))
 
 # 辩论配置

@@ -39,7 +39,7 @@
     <!-- 广告位 -->
     <div class="ad-container">
       <div class="ad-tag">广告</div>
-      <img src="../assets/ad-placeholder.png" alt="广告" class="ad-image" />
+      <img src="https://img.freepik.com/free-photo/electric-car-charging-station_1359-323.jpg" alt="广告" class="ad-image" />
       <div class="ad-title">#14万级长续航智能满配日产N7#</div>
     </div>
 
@@ -107,25 +107,25 @@
       </div>
       <div class="video-list">
         <div class="video-item">
-          <div class="video-cover">
+          <div class="video-cover" style="background-image: url('https://img.freepik.com/free-photo/people-having-business-meeting_23-2149300635.jpg'); background-size: cover;">
             <div class="play-icon">▶</div>
             <div class="video-duration">12:45</div>
           </div>
           <div class="video-title">当AI遇上传统行业，是颠覆还是革新？</div>
           <div class="video-author">
-            <img src="../assets/avatar-placeholder.png" alt="作者头像" class="author-avatar" />
-            <span class="author-name">辩论学院</span>
+            <div class="author-avatar" style="background-image: url('https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg'); background-size: cover;"></div>
+            <div class="author-name">辩论学院</div>
           </div>
         </div>
         <div class="video-item">
-          <div class="video-cover">
+          <div class="video-cover" style="background-image: url('https://img.freepik.com/free-photo/people-having-business-meeting_23-2149300635.jpg'); background-size: cover;">
             <div class="play-icon">▶</div>
             <div class="video-duration">18:32</div>
           </div>
           <div class="video-title">中美辩手激烈交锋：谁主导未来科技发展？</div>
           <div class="video-author">
-            <img src="../assets/avatar-placeholder.png" alt="作者头像" class="author-avatar" />
-            <span class="author-name">国际辩论场</span>
+            <div class="author-avatar" style="background-image: url('https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg'); background-size: cover;"></div>
+            <div class="author-name">国际辩论场</div>
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@
       </div>
       <div class="activity-list">
         <div class="activity-item">
-          <div class="activity-cover"></div>
+          <div class="activity-cover" style="background-image: url('https://img.freepik.com/free-photo/audience-watching-presentation-business-conference_107420-63795.jpg'); background-size: cover;"></div>
           <div class="activity-info">
             <div class="activity-title">2025全国大学生辩论赛</div>
             <div class="activity-time">05月15日 - 06月30日</div>
@@ -145,7 +145,7 @@
           </div>
         </div>
         <div class="activity-item">
-          <div class="activity-cover"></div>
+          <div class="activity-cover" style="background-image: url('https://img.freepik.com/free-photo/audience-watching-presentation-business-conference_107420-63795.jpg'); background-size: cover;"></div>
           <div class="activity-info">
             <div class="activity-title">AI与人类：未来共存辩论会</div>
             <div class="activity-time">05月20日 19:30</div>
@@ -161,17 +161,17 @@
       </div>
       <div class="product-list">
         <div class="product-item">
-          <div class="product-image"></div>
+          <div class="product-image" style="background-image: url('https://img.freepik.com/free-photo/book-composition-with-open-book_23-2147690555.jpg'); background-size: cover;"></div>
           <div class="product-title">《辩论的艺术》精装版</div>
           <div class="product-price">¥68.00</div>
         </div>
         <div class="product-item">
-          <div class="product-image"></div>
+          <div class="product-image" style="background-image: url('https://img.freepik.com/free-photo/book-composition-with-open-book_23-2147690555.jpg'); background-size: cover;"></div>
           <div class="product-title">辩手专业计时器</div>
           <div class="product-price">¥129.00</div>
         </div>
         <div class="product-item">
-          <div class="product-image"></div>
+          <div class="product-image" style="background-image: url('https://img.freepik.com/free-photo/book-composition-with-open-book_23-2147690555.jpg'); background-size: cover;"></div>
           <div class="product-title">辩论赛专用记分板</div>
           <div class="product-price">¥89.00</div>
         </div>

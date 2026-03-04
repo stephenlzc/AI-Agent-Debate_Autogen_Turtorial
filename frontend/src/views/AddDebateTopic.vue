@@ -34,6 +34,13 @@
         <div class="section-title">新闻大纲</div>
         <div class="news-content">{{ newsOutline }}</div>
       </div>
+       <!-- 辩论海报 -->
+       <div class="debate-poster-container" v-if="selectedTopic && selectedTopic.originalData && selectedTopic.originalData.poster">
+        <div class="section-title">辩论海报</div>
+        <div class="debate-poster">
+          <img :src="selectedTopic.originalData.poster" alt="辩论海报" class="poster-image" />
+        </div>
+      </div>
       
       <div class="generated-topics" v-if="generatedTopics.length > 0">
         <div class="section-title">辩论主题</div>
@@ -44,29 +51,46 @@
             class="topic-item"
             @click="goToDebateDetail(topic)"
           >
-            <div class="topic-title">{{ topic.title }}</div>
-            <div class="topic-description" v-if="topic.description">{{ topic.description }}</div>
-            <div class="topic-arrow">→</div>
+            <div class="topic-content">
+              <div class="topic-title-row">
+                <div class="topic-title">{{ topic.title }}</div>
+                <div class="topic-arrow">→</div>
+              </div>
+              <div class="topic-stances" v-if="topic.pros || topic.cons">
+                <div class="stance-item pro-stance">
+                  <div class="stance-label">正方：</div>
+                  <div class="stance-content">{{ topic.pros }}</div>
+                </div>
+                <div class="stance-item con-stance">
+                  <div class="stance-label">反方：</div>
+                  <div class="stance-content">{{ topic.cons }}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       
+     
+      
 
     </main>
     
-    <div class="button-footer">
+    <!-- <div class="button-footer">
       <button class="next-button" :disabled="!selectedTopic" @click="goToNextStep">
         下一步
       </button>
-    </div>
+    </div> -->
     
     <!-- 底部导航栏 -->
-    <BottomNavBar activePage="add-debate-topic" />
+    <BottomNavBar activePage="hot-debates" />
   </div>
 </template>
 
 <script>
 import BottomNavBar from '../components/BottomNavBar.vue';
+import axios from 'axios';
+import apiConfig from '../config/api.js';
 
 export default {
   name: 'AddDebateTopicView',
@@ -95,50 +119,83 @@ export default {
         return;
       }
       
+      // 检查输入是否是URL
+      if (!this.topicInput.startsWith('http')) {
+        alert('请输入有效的网页URL，必须以http或https开头');
+        return;
+      }
+      
       this.isLoading = true;
+      this.generatedTopics = [];
+      this.newsOutline = '';
       
-      // 模拟生成新闻大纲和辩论主题
-      console.log('生成辩论主题:', this.topicInput);
+      // 调用后端API生成辩论主题
+      console.log('调用API生成辩论主题:', this.topicInput);
       
-      // 这里应该调用后端API解析URL或文字内容
-      // 这里只是模拟生成结果
-      setTimeout(() => {
-        // 生成新闻大纲
-        if (this.topicInput.startsWith('http')) {
-          this.newsOutline = '根据您提供的URL内容，我们提取到以下新闻大纲：\n\n标题：人工智能在教育领域的应用\n\n摘要：本文描述了人工智能如何在教育领域中发挥作用，包括个性化学习、自动评分系统、智能学习助手等方面。文章讨论了AI技术如何提高教学效率，以及可能带来的挑战和风险。';
+      // 发送请求到/api/generate_debate接口
+      axios.post(`${apiConfig.baseURL}/api/generate_debate`, {
+        url: this.topicInput
+      })
+      .then(response => {
+        console.log('API返回数据:', response.data);
+        
+        // 处理返回的数据
+        if (response.data) {
+          // 提取新闻大纲
+          const topic = response.data.topic;
+          const outline = response.data.outline || '';
+          const proArgument = response.data.pros.argument;
+          const conArgument = response.data.cons.argument;
+          
+          // 显示新闻大纲，直接使用API返回的outline字段
+          this.newsOutline = outline;
+          
+          // 生成辩论主题
+          this.generatedTopics = [
+            {
+              id: response.data.id,
+              title: response.data.topic,
+              description: `正方：${proArgument}，反方：${conArgument}`,
+              pros: proArgument,
+              cons: conArgument,
+              originalData: response.data
+            }
+          ];
+          
+          // 自动选择生成的主题
+          this.selectedTopic = this.generatedTopics[0];
         } else {
-          this.newsOutline = '根据您提供的文字内容："' + this.topicInput + '"，我们生成以下大纲：\n\n核心观点：该话题涉及到现代技术与传统方式的冲突与融合。\n\n相关背景：当前社会快速发展，技术革新与传统价值观念的碰撞日益明显。';
+          alert('生成辩论主题失败，请重试');
         }
-        
-        // 生成辩论主题
-        this.generatedTopics = [
-          {
-            id: 101,
-            title: '人工智能是否应该在教育中取代传统教师角色？',
-            description: ''
-          },
-          {
-            id: 102,
-            title: '数字化学习是否会削弱学生的社交能力？',
-            description: ''
-          },
-          {
-            id: 103,
-            title: '技术进步是否会加大教育资源不平等？',
-            description: ''
-          }
-        ];
-        
+      })
+      .catch(error => {
+        console.error('API请求错误:', error);
+        alert('生成辩论主题时出错: ' + (error.response?.data?.error || error.message || '未知错误'));
+      })
+      .finally(() => {
         this.isLoading = false;
-      }, 1500);
+      });
     },
     goToDebateDetail(topic) {
-      // 将选中的话题存储到本地，以便详情页面使用
-      localStorage.setItem('selectedDebateTopic', JSON.stringify(topic));
+      // 选中主题
+      this.selectedTopic = topic;
       
       // 跳转到辩论详情页面
-      this.$router.push('/add-debate-detail');
-    }
+      this.$router.push({
+        path: '/debate',
+        query: { id: topic.id }
+      });
+    },
+    
+    goToNextStep() {
+      if (this.selectedTopic) {
+        this.$router.push({
+          path: '/debate',
+          query: { id: this.selectedTopic.id }
+        });
+      }
+    },
+    
   }
 }
 </script>
@@ -317,9 +374,6 @@ export default {
 }
 
 .topic-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   background-color: white;
   padding: 12px 15px;
   border-bottom: 1px solid #f5f5f5;
@@ -332,11 +386,25 @@ export default {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.topic-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topic-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 .topic-title {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.4;
+  color: #333;
+  flex: 1;
 }
 
 .topic-description {
@@ -347,10 +415,113 @@ export default {
   line-height: 1.4;
 }
 
+.topic-stances {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.stance-item {
+  display: flex;
+  align-items: flex-start;
+  line-height: 1.4;
+}
+
+.stance-label {
+  font-size: 13px;
+  font-weight: 500;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.stance-content {
+  font-size: 13px;
+  color: #444;
+  flex: 1;
+}
+
+.pro-stance .stance-label {
+  color: #1976d2;
+}
+
+.con-stance .stance-label {
+  color: #d32f2f;
+}
+
 .topic-arrow {
   font-size: 18px;
   color: #07c160;
   margin-left: 10px;
+}
+
+/* 辩论海报样式 */
+.debate-poster-container {
+  margin-bottom: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.debate-poster {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 15px;
+}
+
+.poster-image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.poster-placeholder {
+  width: 100%;
+  height: 200px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.poster-topic {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.poster-vs {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.blue-team-name {
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.vs-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #666;
+}
+
+.red-team-name {
+  color: #d32f2f;
+  font-weight: 500;
 }
 
 .button-footer {
