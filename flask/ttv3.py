@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+from dotenv import load_dotenv
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdksis.v1.region.sis_region import SisRegion
 from huaweicloudsdkcore.exceptions import exceptions
@@ -100,6 +101,10 @@ def base64_to_mp3(base64_str: str,
 #         print(e.error_msg)
 
 
+# 加载.env文件
+load_dotenv()
+
+
 def text_to_speech(text: str,
                    property: str = "chinese_xiaoqi_common",
                    audio_format: str = "mp3",
@@ -121,8 +126,8 @@ def text_to_speech(text: str,
         RuntimeError - 当语音合成失败时
     """
     # 安全获取凭证 - 从环境变量读取
-    ak = "HPUAUF7PCLU03FNVVFW2"
-    sk = "YOKpeKt6bIfYPCYVVbaxKlUc7IIATnITXs7qlF4B"
+    ak = os.getenv('HUAWEI_CLOUD_AK')
+    sk = os.getenv('HUAWEI_CLOUD_SK')
 
     if not ak or not sk:
         raise ValueError("华为云AK/SK未配置，请设置HUAWEI_CLOUD_AK和HUAWEI_CLOUD_SK环境变量")

@@ -1,12 +1,29 @@
-from flask import Flask, request, Response,Blueprint
+import os
+from flask import Flask, request, Response, Blueprint
 import requests
-# 初始化 Flask 应用
-ttv = Blueprint('ttv',__name__)
+from dotenv import load_dotenv
 
-# 固定的 API 密钥和请求头
-API_URL = "https://api.siliconflow.cn/v1/audio/speech"
+# 加载.env文件
+load_dotenv()
+
+# 从环境变量读取API配置
+TTS_API_KEY = os.getenv('TTS_API_KEY')
+TTS_API_BASE = os.getenv('TTS_API_BASE', 'https://api.siliconflow.cn/v1')
+
+# 检查API key是否设置
+if not TTS_API_KEY:
+    raise ValueError(
+        "TTS_API_KEY environment variable is not set. "
+        "Please set it in your .env file or environment variables."
+    )
+
+# 初始化 Flask 应用
+ttv = Blueprint('ttv', __name__)
+
+# API URL 和请求头
+API_URL = f"{TTS_API_BASE}/audio/speech"
 HEADERS = {
-    "Authorization": "Bearer sk-fbpycjnvwyhmzultheyeccfzwezovljdmqxgdpqqwjotxbgp",
+    "Authorization": f"Bearer {TTS_API_KEY}",
     "Content-Type": "application/json"
 }
 
@@ -53,7 +70,8 @@ def generate_speech():
             API_URL,
             headers=HEADERS,
             json=payload,
-            stream=True  # 启用流式响应
+            stream=True,  # 启用流式响应
+            timeout=30  # 设置30秒超时
         )
 
         # 处理错误响应
@@ -73,6 +91,9 @@ def generate_speech():
 
 # 主函数，启动 Flask 应用
 if __name__ == '__main__':
+    # 创建Flask应用实例
+    app = Flask(__name__)
+    app.register_blueprint(ttv)
     # 运行Flask应用程序
     # 参数host设置为'0.0.0.0'，表示应用程序将监听所有公网IP接口，不仅限于localhost
     # 参数port设置为9000，指定应用程序运行的端口号为9000

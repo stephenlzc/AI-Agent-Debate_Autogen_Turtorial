@@ -1,19 +1,30 @@
 from datetime import datetime
 import json
 import uuid
+import os
 from flask import Flask, request, jsonify, Blueprint
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from debates import add_debate
-from  photo import get_photo
+from photo import get_photo
 from ttv3 import text_to_speech
+
+# 加载环境变量
+load_dotenv()
+
+# 从环境变量读取API key
+MODELARTS_API_KEY = os.getenv("MODELARTS_API_KEY")
+if not MODELARTS_API_KEY:
+    raise ValueError("环境变量 MODELARTS_API_KEY 未设置，请设置该环境变量后重试")
+
 debatefromnews = Blueprint('debatefromnews', __name__)
 
 # 定义目标API的固定参数
 API_URL = "https://api.modelarts-maas.com/v1/chat/completions"
 HEADERS = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer YOVu9vLFu3JG5Pl7ruiHud2trqaUNHojAcJVMFcfSUmOhBIJEMWW5Dui9oB1LIImZFSS2tszw51jTDBoqO8Ppg"
+    "Authorization": f"Bearer {MODELARTS_API_KEY}"
 }
 
 
@@ -31,7 +42,7 @@ def generate_debate():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         # 获取目标网页内容
-        response = requests.get(target_url, headers=headers)
+        response = requests.get(target_url, headers=headers, timeout=30)
         response.raise_for_status()
         # 自动处理编码（根据网页内容自适应）
         response.encoding = response.apparent_encoding
@@ -73,7 +84,7 @@ def generate_debate():
         }
 
         # 调用目标API
-        api_response = requests.post(API_URL, headers=HEADERS, json=payload)
+        api_response = requests.post(API_URL, headers=HEADERS, json=payload, timeout=30)
         api_response.raise_for_status()
         # 提取content字段
         content = api_response.json()['choices'][0]['message']['content']
@@ -112,10 +123,12 @@ def generate_debate():
                         audio_path = text_to_speech(round_data["msg"],"chinese_huaxiaoyan_common")
                     # 添加path字段
                     round_data["path"] = audio_path
+            # 只在JSON解析成功时添加辩论记录
+            add_debate(parsed_json)
+            return jsonify(parsed_json)
         except json.JSONDecodeError as e:
             print(f"JSON解析错误: {e}")
-        add_debate(parsed_json)
-        return jsonify(parsed_json)
+            return jsonify({"error": f"JSON解析错误: {str(e)}"}), 500
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"API request failed: {str(e)}"}), 500
     except ValueError:

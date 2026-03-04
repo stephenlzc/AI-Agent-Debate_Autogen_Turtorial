@@ -7,9 +7,13 @@ WebSocket连接管理模块
 """
 
 import json
+import logging
 from typing import List, Dict, Any, Union
 from fastapi import WebSocket
 from pydantic import BaseModel
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
@@ -80,10 +84,28 @@ class ConnectionManager:
             message_str = json.dumps(message)
         else:
             message_str = str(message)
-            
-        # 广播消息
-        for connection in self.active_connections:
-            await connection.send_text(message_str)
+        
+        # 复制列表避免修改迭代中的列表（防止其他协程修改连接列表）
+        connections = self.active_connections.copy()
+        
+        # 广播消息到每个连接，单独处理异常
+        disconnected = []
+        for connection in connections:
+            try:
+                await connection.send_text(message_str)
+            except Exception as e:
+                # 记录错误但继续处理其他连接
+                logger.warning(f"广播消息失败，准备断开连接: {str(e)}")
+                disconnected.append(connection)
+        
+        # 断开失败的连接
+        for connection in disconnected:
+            try:
+                self.disconnect(connection)
+                # 尝试关闭连接
+                await connection.close()
+            except Exception as e:
+                logger.debug(f"关闭连接时出错: {str(e)}")
 
 # 创建全局连接管理器实例
 manager = ConnectionManager()

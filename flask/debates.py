@@ -3,6 +3,9 @@ from datetime import datetime
 import uuid
 import json
 import os
+import threading
+import tempfile
+import shutil
 from typing import List, Dict
 
 debateck = Blueprint('debateck', __name__)
@@ -12,6 +15,9 @@ debateck = Blueprint('debateck', __name__)
 DEBATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'debates.jsonl')
 MAX_DEBATES = 100
 DEBATES: List[Dict] = []
+
+# 线程锁，保护DEBATES全局列表和文件操作
+debates_lock = threading.Lock()
 
 # 示例数据
 sample_debates = [
@@ -87,13 +93,29 @@ def load_debates_from_file():
 
 
 def save_debates_to_file():
-    """保存当前辩论数据到文件"""
-    try:
-        with open(DEBATE_FILE, 'w', encoding='utf-8') as f:
-            for debate in DEBATES:
-                f.write(json.dumps(debate, ensure_ascii=False) + '\n')
-    except Exception as e:
-        print(f"保存辩论数据失败: {e}")
+    """保存当前辩论数据到文件（线程安全，原子写入）"""
+    with debates_lock:
+        try:
+            # 使用原子写入：先写入临时文件，再重命名
+            # 这样即使写入过程中断，原始文件也不会损坏
+            temp_fd, temp_path = tempfile.mkstemp(
+                dir=os.path.dirname(DEBATE_FILE),
+                prefix='.debates_',
+                suffix='.tmp'
+            )
+            try:
+                with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+                    for debate in DEBATES:
+                        f.write(json.dumps(debate, ensure_ascii=False) + '\n')
+                # 原子重命名操作
+                shutil.move(temp_path, DEBATE_FILE)
+            except Exception:
+                # 如果发生错误，清理临时文件
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                raise
+        except Exception as e:
+            print(f"保存辩论数据失败: {e}")
 
 
 # 初始化加载数据
@@ -102,9 +124,10 @@ load_debates_from_file()
 
 def add_debate(debate: Dict):
     """添加新辩论并保存到文件"""
-    DEBATES.insert(0, debate)
-    if len(DEBATES) > MAX_DEBATES:
-        DEBATES.pop()
+    with debates_lock:
+        DEBATES.insert(0, debate)
+        if len(DEBATES) > MAX_DEBATES:
+            DEBATES.pop()
     save_debates_to_file()
 
 
@@ -156,11 +179,14 @@ def get_debate_detail():
     """获取辩论详情"""
     debate_id = request.args.get('debate_id')
     try:
-        target_debate = next((d for d in DEBATES if d['id'] == debate_id), None)
-        if not target_debate:
-            return jsonify({"code": 404, "message": "未找到辩论"}), 404
+        with debates_lock:
+            target_debate = next((d for d in DEBATES if d['id'] == debate_id), None)
+            if not target_debate:
+                return jsonify({"code": 404, "message": "未找到辩论"}), 404
 
-        target_debate['view_count'] += 1
+            target_debate['view_count'] += 1
+        
+        # 在锁外执行文件保存操作
         save_debates_to_file()
 
         return jsonify({

@@ -12,7 +12,9 @@ import tempfile
 import uuid
 import base64
 import json
+import logging
 from typing import Optional, Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor
 
 import aiohttp
 from pydub import AudioSegment
@@ -20,8 +22,14 @@ from pydub import AudioSegment
 from api.config import (SPEECH_OUTPUT_DIR, SPEECH_ENABLED, SPEECH_API_TYPE,
                         SPEECH_API_KEY, SPEECH_API_BASE, SPEECH_DEFAULT_MODEL,
                         SPEECH_DEFAULT_VOICE, SPEECH_SAMPLE_RATE, SPEECH_CACHE_ENABLED,
-                        SPEECH_DEFAULT_CHUNK_SIZE)
+                        SPEECH_DEFAULT_CHUNK_SIZE, DEBUG)
 from api.models import SpeechChunk, SpeechResult
+
+# 配置日志
+logger = logging.getLogger(__name__)
+
+# 创建线程池用于同步IO操作
+_thread_pool = ThreadPoolExecutor(max_workers=4)
 
 # 确保输出目录存在
 os.makedirs(SPEECH_OUTPUT_DIR, exist_ok=True)
@@ -82,14 +90,21 @@ class SpeechService:
             cache_path = os.path.join(SPEECH_OUTPUT_DIR, f"cache_{hash(cache_key)}.mp3")
             
             if os.path.exists(cache_path):
-                # 使用缓存的语音文件
-                import shutil
-                shutil.copy2(cache_path, output_path)
+                # 使用缓存的语音文件（异步复制和读取）
+                await asyncio.get_event_loop().run_in_executor(
+                    _thread_pool,
+                    _copy_file_sync,
+                    cache_path,
+                    output_path
+                )
                 
-                # 读取文件并转换为base64
-                with open(output_path, "rb") as audio_file:
-                    audio_data = audio_file.read()
-                    audio_base64 = base64.b64encode(audio_data).decode("utf-8")
+                # 异步读取文件并转换为base64
+                audio_data = await asyncio.get_event_loop().run_in_executor(
+                    _thread_pool,
+                    _read_file_sync,
+                    output_path
+                )
+                audio_base64 = base64.b64encode(audio_data).decode("utf-8")
                 
                 # 创建并返回SpeechChunk对象
                 speech_chunk = SpeechChunk(
@@ -122,37 +137,55 @@ class SpeechService:
                 "gain": 0
             }
             
-            # 调试信息
-            print(f"调试信息 - SiliconFlow API请求数据:")
-            print(f"  - URL: {SPEECH_API_BASE}/audio/speech")
-            print(f"  - 模型: {model}")
-            print(f"  - 声音: {voice}")
-            print(f"  - 采样率: {SPEECH_SAMPLE_RATE}")
-            print(f"  - 完整请求数据: {json.dumps(data, ensure_ascii=False)}")
+            # 调试信息（仅在DEBUG模式下打印详细请求数据）
+            if DEBUG:
+                logger.debug(f"SiliconFlow API请求数据:")
+                logger.debug(f"  - URL: {SPEECH_API_BASE}/audio/speech")
+                logger.debug(f"  - 模型: {model}")
+                logger.debug(f"  - 声音: {voice}")
+                logger.debug(f"  - 采样率: {SPEECH_SAMPLE_RATE}")
+                # 隐藏敏感信息（API密钥）
+                debug_data = data.copy()
+                logger.debug(f"  - 请求数据: {json.dumps(debug_data, ensure_ascii=False)}")
             
-            async with aiohttp.ClientSession() as session:
+            # 设置超时（总超时30秒）
+            timeout = aiohttp.ClientTimeout(total=30)
+            
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{SPEECH_API_BASE}/audio/speech",
                     headers=headers,
                     json=data
                 ) as response:
                     if response.status == 200:
-                        # 保存音频文件
-                        with open(output_path, "wb") as f:
-                            f.write(await response.read())
+                        # 异步保存音频文件（使用线程池避免阻塞事件循环）
+                        audio_data = await response.read()
+                        await asyncio.get_event_loop().run_in_executor(
+                            _thread_pool, 
+                            _write_file_sync, 
+                            output_path, 
+                            audio_data
+                        )
                     else:
                         error_text = await response.text()
                         raise Exception(f"SiliconFlow API错误: {error_text}")
             
-            # 如果启用缓存，保存副本
+            # 如果启用缓存，异步保存副本
             if SPEECH_CACHE_ENABLED:
-                import shutil
-                shutil.copy2(output_path, cache_path)
+                await asyncio.get_event_loop().run_in_executor(
+                    _thread_pool,
+                    _copy_file_sync,
+                    output_path,
+                    cache_path
+                )
             
-            # 读取文件并转换为base64
-            with open(output_path, "rb") as audio_file:
-                audio_data = audio_file.read()
-                audio_base64 = base64.b64encode(audio_data).decode("utf-8")
+            # 异步读取文件并转换为base64
+            audio_data = await asyncio.get_event_loop().run_in_executor(
+                _thread_pool,
+                _read_file_sync,
+                output_path
+            )
+            audio_base64 = base64.b64encode(audio_data).decode("utf-8")
             
             # 创建并返回SpeechChunk对象
             speech_chunk = SpeechChunk(
@@ -162,10 +195,17 @@ class SpeechService:
             )
             
             return speech_chunk.dict()
-        except Exception as e:
-            print(f"语音生成失败: {str(e)}")
+        except asyncio.TimeoutError:
+            logger.error(f"语音生成超时（30秒）", exc_info=True)
             return {
-                "error": str(e)
+                "error": "语音生成超时，请稍后重试"
+            }
+        except Exception as e:
+            # 记录详细错误（生产环境不暴露给客户端）
+            logger.error(f"语音生成失败: {str(e)}", exc_info=True)
+            error_message = str(e) if DEBUG else "语音生成失败，请检查配置或稍后重试"
+            return {
+                "error": error_message
             }
     
     async def generate_speech_chunks(self, text: str, agent_name: str, chunk_size: int = None) -> Dict[str, Any]:
@@ -244,6 +284,24 @@ class SpeechService:
         )
         
         return result.dict()
+
+def _write_file_sync(file_path: str, data: bytes):
+    """同步写入文件的辅助函数（在线程池中执行）"""
+    with open(file_path, "wb") as f:
+        f.write(data)
+
+
+def _read_file_sync(file_path: str) -> bytes:
+    """同步读取文件的辅助函数（在线程池中执行）"""
+    with open(file_path, "rb") as f:
+        return f.read()
+
+
+def _copy_file_sync(src_path: str, dst_path: str):
+    """同步复制文件的辅助函数（在线程池中执行）"""
+    import shutil
+    shutil.copy2(src_path, dst_path)
+
 
 # 创建语音服务实例
 speech_service = SpeechService()

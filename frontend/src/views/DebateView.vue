@@ -181,7 +181,9 @@ export default {
       audioInitialized: false, // 音频是否已初始化
       audioFinished: true, // 音频是否播放完成
       textFinished: true, // 文字是否显示完成
-      debateStarted: false // 辩论是否已开始
+      debateStarted: false, // 辩论是否已开始
+      // 定时器ID集合，用于清理
+      timerIds: []
     }
   },
   created() {
@@ -196,7 +198,34 @@ export default {
     
     // 不自动启动打字机效果，等待用户点击开始按钮
   },
+  // 组件销毁前清理所有定时器和资源
+  beforeUnmount() {
+    this.clearAllTimers();
+    this.stopAudio();
+  },
   methods: {
+    // 保存定时器ID
+    saveTimerId(timerId) {
+      this.timerIds.push(timerId);
+      return timerId;
+    },
+    
+    // 清理所有定时器
+    clearAllTimers() {
+      this.timerIds.forEach(timerId => {
+        clearTimeout(timerId);
+      });
+      this.timerIds = [];
+    },
+    
+    // 移除已执行的定时器ID
+    removeTimerId(timerId) {
+      const index = this.timerIds.indexOf(timerId);
+      if (index > -1) {
+        this.timerIds.splice(index, 1);
+      }
+    },
+
     // 开始辩论
     startDebate() {
       this.debateStarted = true;
@@ -238,7 +267,10 @@ export default {
         }
         
         // 请求辩论详情数据
-        const response = await axios.get(`${apiConfig.getUrl(apiConfig.endpoints.debateDetail)}?debate_id=${debateId}`);
+        const response = await apiConfig.get(
+          `${apiConfig.getUrl(apiConfig.endpoints.debateDetail)}?debate_id=${debateId}`,
+          { timeout: 10000 }
+        );
         
         if (response.data && response.data.code === 200) {
           const debateData = response.data.data;
@@ -288,6 +320,9 @@ export default {
     
     // 启动打字机效果
     startTypingEffect() {
+      // 先清理所有之前的定时器
+      this.clearAllTimers();
+      
       // 重置所有消息的显示状态
       this.messages.forEach(message => {
         message.displayContent = '';
@@ -356,10 +391,12 @@ export default {
         this.scrollToLatestMessage();
       }
       
-      // 设置下一个字符的延迟
-      setTimeout(() => {
+      // 设置下一个字符的延迟，并保存定时器ID
+      const timerId = setTimeout(() => {
+        this.removeTimerId(timerId);
         this.typeMessage(message);
       }, this.typingSpeed);
+      this.saveTimerId(timerId);
     },
     
     // 检查是否可以进行下一条消息
@@ -367,12 +404,14 @@ export default {
       // 如果文字和音频都已完成，或者静音状态下文字已完成
       if ((this.textFinished && this.audioFinished) || (this.textFinished && this.isMuted)) {
         // 延迟一段时间后显示下一条消息
-        setTimeout(() => {
+        const timerId = setTimeout(() => {
+          this.removeTimerId(timerId);
           // 当前消息播放完毕，准备下一条消息
           this.stopAudio(); // 停止当前音频
           this.activeMessageIndex++;
           this.typeNextMessage();
         }, 500);
+        this.saveTimerId(timerId);
       }
     },
     
@@ -531,12 +570,16 @@ export default {
         const apiBaseUrl = apiConfig.baseURL; // 直接使用导入的apiConfig
         
         // 请求保存辩论信息
-        const response = await axios.post(`${apiBaseUrl}/debate_view/save`, {
-          debateInfo: this.debateInfo,
-          debateRounds: this.debateRounds,
-          currentRound: this.currentRound,
-          messages: this.messages
-        });
+        const response = await apiConfig.post(
+          `${apiBaseUrl}/debate_view/save`,
+          {
+            debateInfo: this.debateInfo,
+            debateRounds: this.debateRounds,
+            currentRound: this.currentRound,
+            messages: this.messages
+          },
+          { timeout: 10000 }
+        );
         
         if (response.data && response.data.success) {
           console.log('辩论信息保存成功', response.data);

@@ -7,6 +7,7 @@
 """
 
 import json
+import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Body
 from typing import Dict, Any
 
@@ -15,8 +16,11 @@ from api.agents import test_llm_connection
 from api.debate import start_debate
 from api.websocket import manager
 from api.speech import speech_service
-from api.config import SPEECH_ENABLED
+from api.config import SPEECH_ENABLED, DEBUG
 from api.debate_view import debate_view_router  # 导入辩论视图路由
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 # 创建路由
 router = APIRouter()
@@ -147,7 +151,17 @@ async def websocket_debate(websocket: WebSocket):
                             websocket
                         )
                 except Exception as e:
-                    print(f"语音生成失败: {str(e)}")
+                    # 记录详细错误日志
+                    logger.error(f"语音生成失败: {str(e)}", exc_info=True)
+                    # 向客户端发送错误通知（生产环境隐藏详细错误）
+                    error_message = str(e) if DEBUG else "语音生成失败，请稍后重试"
+                    try:
+                        await manager.send_message(
+                            json.dumps({"status": "error", "type": "speech_generation_failed", "message": error_message}),
+                            websocket
+                        )
+                    except Exception as send_error:
+                        logger.error(f"发送错误通知失败: {str(send_error)}", exc_info=True)
         
         # 定义Token流回调函数
         async def token_callback(agent_name, token):
@@ -180,7 +194,17 @@ async def websocket_debate(websocket: WebSocket):
                         websocket
                     )
             except Exception as e:
-                print(f"Token回调处理错误: {str(e)}")
+                # 记录详细错误日志
+                logger.error(f"Token回调处理错误: {str(e)}", exc_info=True)
+                # 向客户端发送错误通知（生产环境隐藏详细错误）
+                error_message = str(e) if DEBUG else "消息处理失败，请稍后重试"
+                try:
+                    await manager.send_message(
+                        json.dumps({"status": "error", "type": "token_callback_error", "message": error_message}),
+                        websocket
+                    )
+                except Exception as send_error:
+                    logger.error(f"发送错误通知失败: {str(send_error)}", exc_info=True)
         
         # 启动辩论
         result = await start_debate(config, message_callback, token_callback)
@@ -190,5 +214,13 @@ async def websocket_debate(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        await manager.send_message(json.dumps({"status": "error", "message": str(e)}), websocket)
-        manager.disconnect(websocket)
+        # 记录详细错误日志
+        logger.error(f"WebSocket辩论处理错误: {str(e)}", exc_info=True)
+        # 向客户端发送错误通知（生产环境隐藏详细错误）
+        error_message = str(e) if DEBUG else "辩论处理失败，请稍后重试"
+        try:
+            await manager.send_message(json.dumps({"status": "error", "message": error_message}), websocket)
+        except Exception as send_error:
+            logger.error(f"发送错误通知失败: {str(send_error)}", exc_info=True)
+        finally:
+            manager.disconnect(websocket)

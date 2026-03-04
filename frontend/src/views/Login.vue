@@ -8,10 +8,18 @@
       
       <div class="input-area">
         <div class="phone-input">
-          <input type="tel" v-model="phoneNumber" placeholder="请输入手机号" maxlength="11" />
+          <input 
+            type="tel" 
+            v-model="phoneNumber" 
+            placeholder="请输入手机号" 
+            maxlength="11"
+            @blur="validatePhone"
+            :class="{ 'input-error': phoneError }"
+          />
+          <span v-if="phoneError" class="error-message">{{ phoneError }}</span>
         </div>
         
-        <div class="login-button" @click="handleLogin">
+        <div class="login-button" @click="handleLogin" :class="{ 'disabled': !isValidPhone }">
           一键登录
         </div>
         
@@ -34,19 +42,50 @@ export default {
   name: 'LoginView',
   data() {
     return {
-      phoneNumber: '152****5055'
+      phoneNumber: '',  // 初始化为空字符串
+      phoneError: ''    // 手机号验证错误信息
+    }
+  },
+  computed: {
+    // 计算属性：验证手机号格式
+    isValidPhone() {
+      const phoneRegex = /^1[3-9]\d{9}$/;
+      return phoneRegex.test(this.phoneNumber);
     }
   },
   methods: {
+    // 手机号格式验证
+    validatePhone() {
+      this.phoneError = '';
+      if (!this.phoneNumber) {
+        this.phoneError = '请输入手机号';
+        return false;
+      }
+      const phoneRegex = /^1[3-9]\d{9}$/;
+      if (!phoneRegex.test(this.phoneNumber)) {
+        this.phoneError = '请输入正确的11位手机号';
+        return false;
+      }
+      return true;
+    },
+    
     handleLogin() {
-      // 模拟登录过程
-      console.log('登录中...');
+      // 验证手机号
+      if (!this.validatePhone()) {
+        return;
+      }
       
-      // 存储token
+      // 模拟登录过程
+      console.log('登录中...手机号:', this.phoneNumber);
+      
+      // 存储token和手机号
       localStorage.setItem('token', 'demo-token');
+      localStorage.setItem('userPhone', this.phoneNumber);
+      
       // 登录成功后跳转到热点辩论页面
       this.$router.push('/hot-debates');
     },
+    
     goToOtherLogin() {
       this.$router.push('/other-login');
     }
@@ -114,6 +153,17 @@ export default {
   padding: 8px 0;
 }
 
+.phone-input input.input-error {
+  border-bottom: 1px solid #ff4a4a;
+}
+
+.error-message {
+  display: block;
+  color: #ff4a4a;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
 .login-button {
   background-color: #07c160;
   color: white;
@@ -128,6 +178,11 @@ export default {
 
 .login-button:hover {
   background-color: #06ad56;
+}
+
+.login-button.disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 .other-login-options {

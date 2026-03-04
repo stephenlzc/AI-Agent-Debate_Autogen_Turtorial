@@ -36,9 +36,22 @@ DEBATES_OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspat
 os.makedirs(DEBATES_OUTPUT_DIR, exist_ok=True)
 os.makedirs(SPEECH_OUTPUT_DIR, exist_ok=True)
 
-# 检查必要的环境变量
-if not all([CUSTOM_LLM_API_KEY, CUSTOM_LLM_API_BASE, CUSTOM_LLM_MODEL]):
-    raise ValueError("请确保.env文件中包含所有必要的配置项")
+# 延迟检查环境变量，避免导入时就失败
+import warnings
+
+def check_config():
+    """检查必要的环境变量配置，返回是否配置完整"""
+    if not all([CUSTOM_LLM_API_KEY, CUSTOM_LLM_API_BASE, CUSTOM_LLM_MODEL]):
+        warnings.warn(
+            "未配置LLM API相关环境变量(CUSTOM_LLM_API_KEY, CUSTOM_LLM_API_BASE, CUSTOM_LLM_MODEL)，"
+            "部分功能可能无法正常使用",
+            RuntimeWarning
+        )
+        return False
+    return True
+
+# 导入时不强制检查，允许测试在不设置环境变量的情况下运行
+CONFIG_VALID = check_config()
 
 # 默认配置
 DEFAULT_CONFIG = {
@@ -84,7 +97,12 @@ SPEECH_CONFIG = {
 # 服务器配置
 SERVER_HOST = os.getenv('SERVER_HOST', '0.0.0.0')
 SERVER_PORT = int(os.getenv('SERVER_PORT', '8001'))  # 修改默认端口为8001
-CORS_ORIGINS = json.loads(os.getenv('CORS_ORIGINS', '["*"]'))
+# CORS配置 - 默认只允许localhost
+_default_origins = '["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000"]'
+CORS_ORIGINS = json.loads(os.getenv('ALLOWED_ORIGINS', os.getenv('CORS_ORIGINS', _default_origins)))
 
 # 辩论配置
 DEFAULT_MAX_ROUNDS = int(os.getenv('DEFAULT_MAX_ROUNDS', '3'))
+
+# 调试和环境配置
+DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'

@@ -7,6 +7,23 @@ import hashlib
 import hmac
 import requests
 from flask import Flask, request, jsonify,Blueprint
+from dotenv import load_dotenv
+
+# 加载.env文件
+load_dotenv()
+
+# 从环境变量读取火山引擎密钥
+VOLCANO_ACCESS_KEY = os.getenv('VOLCANO_ACCESS_KEY')
+VOLCANO_SECRET_KEY = os.getenv('VOLCANO_SECRET_KEY')
+
+# 延迟检查环境变量到实际使用时
+if not VOLCANO_ACCESS_KEY or not VOLCANO_SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "火山引擎密钥未配置，请设置VOLCANO_ACCESS_KEY和VOLCANO_SECRET_KEY环境变量，"
+        "图片生成功能将无法使用",
+        RuntimeWarning
+    )
 
 photo = Blueprint('photo',__name__)
 
@@ -39,8 +56,7 @@ def formatQuery(parameters):
 
 def signV4Request(access_key, secret_key, service, req_query, req_body):
     if access_key is None or secret_key is None:
-        print('No access key is available.')
-        sys.exit()
+        raise ValueError('No access key is available. Please set VOLCANO_ACCESS_KEY and VOLCANO_SECRET_KEY environment variables.')
 
     t = datetime.datetime.utcnow()
     current_date = t.strftime('%Y%m%dT%H%M%SZ')
@@ -85,7 +101,7 @@ def signV4Request(access_key, secret_key, service, req_query, req_body):
     print('\nBEGIN REQUEST++++++++++++++++++++++++++++++++++++')
     print('Request URL = ' + request_url)
     try:
-        r = requests.post(request_url, headers=headers, data=req_body)
+        r = requests.post(request_url, headers=headers, data=req_body, timeout=30)
     except Exception as err:
         print(f'error occurred: {err}')
         raise
@@ -103,10 +119,6 @@ def generate_photo():
     theme = request.args.get('theme')
     if not theme:
         return jsonify({"error": "Missing theme parameter"}), 400
-    # 请求凭证，从访问控制申请
-    access_key = 'AKLTZTczNTZiMGE3ZDBkNGQxMTk2MGJmOTA4MDA1Y2QxY2M'
-    secret_key = 'TkRGalptRTNZemRoWWpjd05HSmtZV0psTW1NNVptVXhaalF4T0dJeE9USQ=='
-
     # 请求Query，按照接口文档中填入即可
     query_params = {
         'Action': 'CVProcess',
@@ -122,16 +134,13 @@ def generate_photo():
     }
     formatted_body = json.dumps(body_params)
 
-    return signV4Request(access_key, secret_key, service,
+    return signV4Request(VOLCANO_ACCESS_KEY, VOLCANO_SECRET_KEY, service,
                   formatted_query, formatted_body)
 
 def get_photo(theme: str):
     # 获取URL参数
     if not theme:
         return jsonify({"error": "Missing theme parameter"}), 400
-    # 请求凭证，从访问控制申请
-    access_key = 'AKLTZTczNTZiMGE3ZDBkNGQxMTk2MGJmOTA4MDA1Y2QxY2M'
-    secret_key = 'TkRGalptRTNZemRoWWpjd05HSmtZV0psTW1NNVptVXhaalF4T0dJeE9USQ=='
 
     # 请求Query，按照接口文档中填入即可
     query_params = {
@@ -147,7 +156,7 @@ def get_photo(theme: str):
         "prompt": f"生成一张辩论赛海报，辩论赛主题是\n{theme}\n，海报上要配有辩论赛主题文字字样和双方的队伍名称"
     }
     formatted_body = json.dumps(body_params)
-    formatted_body = signV4Request(access_key, secret_key, service,
+    formatted_body = signV4Request(VOLCANO_ACCESS_KEY, VOLCANO_SECRET_KEY, service,
                   formatted_query, formatted_body)
     first_image_url = formatted_body["data"]["image_urls"][0]
 
